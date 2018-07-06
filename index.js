@@ -1,32 +1,35 @@
+const express = require('express');
 const protobuf = require("protocol-buffers");
 const fs = require("fs");
 
 let messages = protobuf(fs.readFileSync('model.proto'));
+let app = express();
 
-let buf1 = messages.Collection.encode(
-    {
-        id: "1",
-        name: "bob",
-        description: "description bob",
-        created_ts_micros: 123456,
-        subscriber_ids: [],
-        items: []
+app.use(function(req, res, next){
+    console.log(req.headers);
+    if(!req.is('application/octet-stream')) return next();
+    let data = [];
+
+    // listening data from request
+    req.on('data', function(chunk){
+        data.push(chunk);
+    });
+
+    req.on('end', function(){
+        if (data.length < 0) return next();
+
+        data = Buffer.concat(data);        
+        req.raw = data;
+        return next();
+    });
+});
+
+app.post('/api/collection', function(req, res){
+    if (req.raw){
+        let data = messages.Collection.decode(req.raw);
+        console.log("Protobuf data decoded: " + JSON.stringify(data));
     }
-);
+    res.send("done");
+});
 
-let buf2 = messages.Collection.encode(
-    {
-        id: "2",
-        name: "alice",
-        description: "description alice",
-        created_ts_micros: 123456,
-        subscriber_ids: ["1","2","3","4","5"],
-        items: []
-    }
-);
-
-console.log(buf1);
-console.log(buf2);
-
-let obj2 = messages.Collection.decode(buf2);
-console.log(obj2);
+app.listen(3000);
